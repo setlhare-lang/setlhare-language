@@ -4,8 +4,8 @@ import argparse
 import pathlib
 import sys
 
-from .runtime.interpreter import Interpreter
 from .compiler.driver import compile_file
+from .runtime.interpreter import Interpreter
 from .tools.spore import Spore
 
 
@@ -16,9 +16,11 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="Run a .sl source file")
     run_p.add_argument("file")
 
-    repl_p = sub.add_parser("repl", help="Start a small Setlhare REPL")
+    sub.add_parser("repl", help="Start a small Setlhare REPL")
 
-    check_p = sub.add_parser("check", help="Parse and type-check a file using the compiler skeleton")
+    check_p = sub.add_parser(
+        "check", help="Parse and type-check a file using the compiler skeleton"
+    )
     check_p.add_argument("file")
 
     build_p = sub.add_parser("build", help="Compile a file to selected backend artifacts")
@@ -40,7 +42,11 @@ def main(argv: list[str] | None = None) -> int:
             Interpreter().repl()
             return 0
         if args.cmd in {"check", "build"}:
-            compile_file(pathlib.Path(args.file), target=getattr(args, "target", "bytecode"), emit=args.cmd == "build")
+            compile_file(
+                pathlib.Path(args.file),
+                target=getattr(args, "target", "bytecode"),
+                emit=args.cmd == "build",
+            )
             return 0
         if args.cmd == "spore":
             spore = Spore(pathlib.Path.cwd())
@@ -51,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
             elif args.spore_cmd == "test":
                 spore.test()
             return 0
-    except Exception as exc:  # noqa: BLE001 - CLI should format all toolchain failures.
+    except Exception as exc:
         print(f"setlhare: error: {exc}", file=sys.stderr)
         return 1
     return 0

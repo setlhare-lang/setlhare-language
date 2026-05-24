@@ -4,21 +4,25 @@ import builtins
 import pathlib
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from setlhare.errors import ImmutableAssignmentError, SetlhareRuntimeError
-from setlhare.parser.parser import Parser
 from setlhare.parser import ast as A
+from setlhare.parser.parser import Parser
+
 
 class ReturnSignal(Exception):
     def __init__(self, value: Any):
         self.value = value
 
+
 class BreakSignal(Exception):
     pass
 
+
 class ContinueSignal(Exception):
     pass
+
 
 @dataclass(slots=True)
 class BindingInfo:
@@ -26,12 +30,15 @@ class BindingInfo:
     mutable: bool = True
     type_name: str | None = None
 
+
 @dataclass(slots=True)
 class Environment:
-    parent: "Environment | None" = None
+    parent: Environment | None = None
     values: dict[str, BindingInfo] = field(default_factory=dict)
 
-    def define(self, name: str, value: Any, mutable: bool = True, type_name: str | None = None) -> None:
+    def define(
+        self, name: str, value: Any, mutable: bool = True, type_name: str | None = None
+    ) -> None:
         if name in self.values and not self.values[name].mutable:
             raise ImmutableAssignmentError(f"cannot redefine immutable binding '{name}'")
         self.values[name] = BindingInfo(value, mutable, type_name)
@@ -52,13 +59,14 @@ class Environment:
             raise SetlhareRuntimeError(f"undefined name '{name}'")
         return env.values[name].value
 
-    def _find(self, name: str) -> "Environment | None":
+    def _find(self, name: str) -> Environment | None:
         if name in self.values:
             return self
         return self.parent._find(name) if self.parent else None
 
+
 class SetlhareFunction:
-    def __init__(self, node: A.Function, closure: Environment, interpreter: "Interpreter"):
+    def __init__(self, node: A.Function, closure: Environment, interpreter: Interpreter):
         self.node = node
         self.closure = closure
         self.interpreter = interpreter
@@ -81,6 +89,7 @@ class SetlhareFunction:
     def __repr__(self) -> str:
         return f"<func {self.node.name}>"
 
+
 class BoundMethod:
     def __init__(self, receiver: Any, name: str):
         self.receiver = receiver
@@ -89,17 +98,27 @@ class BoundMethod:
     def __call__(self, *args: Any) -> Any:
         r = self.receiver
         if self.name == "map":
-            return type(r)([args[0](x) for x in r]) if isinstance(r, list) else getattr(r, self.name)(*args)
+            return (
+                type(r)([args[0](x) for x in r])
+                if isinstance(r, list)
+                else getattr(r, self.name)(*args)
+            )
         if self.name == "filter":
-            return type(r)([x for x in r if args[0](x)]) if isinstance(r, list) else getattr(r, self.name)(*args)
+            return (
+                type(r)([x for x in r if args[0](x)])
+                if isinstance(r, list)
+                else getattr(r, self.name)(*args)
+            )
         if self.name == "sum" and isinstance(r, (list, tuple, set)):
             return builtins.sum(r)
         if self.name == "parallel":
             from setlhare.stdlib.collections import parallel
+
             workers = args[0] if args else 4
             return parallel(r, workers)
         attr = getattr(r, self.name)
         return attr(*args)
+
 
 class Interpreter:
     """Tree-walking Setlhare runtime.
@@ -139,23 +158,57 @@ class Interpreter:
                 result = self.run_source(line)
                 if result is not None:
                     print(result)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 print(f"error: {exc}")
 
     def _install_builtins(self) -> None:
-        from setlhare.stdlib import actors, collections, fs, http, io, json, math, result, text, time
         from setlhare.runtime import primitives
+        from setlhare.stdlib import (
+            actors,
+            collections,
+            fs,
+            http,
+            io,
+            json,
+            math,
+            result,
+            text,
+            time,
+        )
+
         builtins_env: dict[str, Any] = {
-            "true": True, "false": False, "nil": None,
-            "print": builtins.print, "input": builtins.input,
-            "len": len, "range": range, "int": int, "float": float, "str": str, "bool": bool,
-            "list": list, "dict": dict, "set": set,
-            "Ok": result.Ok, "Err": result.Err, "Result": result.Result,
-            "spawn": actors.spawn, "go": actors.go, "Actor": actors.Actor,
-            "List": collections.List, "parallel": collections.parallel,
+            "true": True,
+            "false": False,
+            "nil": None,
+            "print": builtins.print,
+            "input": builtins.input,
+            "len": len,
+            "range": range,
+            "int": int,
+            "float": float,
+            "str": str,
+            "bool": bool,
+            "list": list,
+            "dict": dict,
+            "set": set,
+            "Ok": result.Ok,
+            "Err": result.Err,
+            "Result": result.Result,
+            "spawn": actors.spawn,
+            "go": actors.go,
+            "Actor": actors.Actor,
+            "List": collections.List,
+            "parallel": collections.parallel,
             "sleep": time.sleep,
-            "io": io, "math": math, "fs": fs, "time": time, "json": json, "text": text,
-            "http": http, "actors": actors, "col": collections,
+            "io": io,
+            "math": math,
+            "fs": fs,
+            "time": time,
+            "json": json,
+            "text": text,
+            "http": http,
+            "actors": actors,
+            "col": collections,
             **primitives.exports(),
         }
         for name, value in builtins_env.items():
@@ -241,17 +294,26 @@ class Interpreter:
     def _import(self, stmt: A.Import, env: Environment) -> None:
         path = stmt.module
         table = {
-            "std::io": "io", "std::math": "math", "std::fs": "fs", "std::time": "time",
-            "std::json": "json", "std::text": "text", "std::result": "result",
-            "col::collections": "collections", "net::http": "http", "std::actors": "actors",
-            "ml::core": "ml", "embed::core": "embed", "quantum::core": "quantum",
+            "std::io": "io",
+            "std::math": "math",
+            "std::fs": "fs",
+            "std::time": "time",
+            "std::json": "json",
+            "std::text": "text",
+            "std::result": "result",
+            "col::collections": "collections",
+            "net::http": "http",
+            "std::actors": "actors",
+            "ml::core": "ml",
+            "embed::core": "embed",
+            "quantum::core": "quantum",
         }
         mod_name = table.get(path, path.split("::")[-1])
         if env._find(mod_name) is not None:
             return None
         try:
             module = __import__(f"setlhare.stdlib.{mod_name}", fromlist=[mod_name])
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise SetlhareRuntimeError(f"cannot import module '{path}'") from exc
         env.define(mod_name, module, mutable=False)
 
@@ -264,6 +326,7 @@ class Interpreter:
             return env.get(expr.name)
         if isinstance(expr, A.ListExpr):
             from setlhare.stdlib.collections import List
+
             return List([self._eval(x, env) for x in expr.items])
         if isinstance(expr, A.SetExpr):
             return {self._eval(x, env) for x in expr.items}
@@ -271,8 +334,10 @@ class Interpreter:
             return {self._eval(k, env): self._eval(v, env) for k, v in expr.items}
         if isinstance(expr, A.Unary):
             right = self._eval(expr.right, env)
-            if expr.op == "-": return -right
-            if expr.op in {"!", "not"}: return not self._truthy(right)
+            if expr.op == "-":
+                return -right
+            if expr.op in {"!", "not"}:
+                return not self._truthy(right)
             raise SetlhareRuntimeError(f"unknown unary operator {expr.op}")
         if isinstance(expr, A.Binary):
             if expr.op == "or":
@@ -281,7 +346,8 @@ class Interpreter:
             if expr.op == "and":
                 left = self._eval(expr.left, env)
                 return self._eval(expr.right, env) if self._truthy(left) else left
-            left = self._eval(expr.left, env); right = self._eval(expr.right, env)
+            left = self._eval(expr.left, env)
+            right = self._eval(expr.right, env)
             return self._apply_binary(expr.op, left, right)
         if isinstance(expr, A.Call):
             fn = self._eval(expr.callee, env)
@@ -291,12 +357,19 @@ class Interpreter:
             return fn(*args)
         if isinstance(expr, A.GetAttr):
             obj = self._eval(expr.obj, env)
-            if isinstance(obj, (list, tuple, set)) and expr.name in {"map", "filter", "sum", "parallel"}:
+            if isinstance(obj, (list, tuple, set)) and expr.name in {
+                "map",
+                "filter",
+                "sum",
+                "parallel",
+            }:
                 return BoundMethod(obj, expr.name)
             try:
                 return getattr(obj, expr.name)
             except AttributeError as exc:
-                raise SetlhareRuntimeError(f"object {obj!r} has no attribute '{expr.name}'") from exc
+                raise SetlhareRuntimeError(
+                    f"object {obj!r} has no attribute '{expr.name}'"
+                ) from exc
         if isinstance(expr, A.Index):
             return self._eval(expr.obj, env)[self._eval(expr.index, env)]
         if isinstance(expr, A.ResultUnwrap):
@@ -312,21 +385,33 @@ class Interpreter:
         raise SetlhareRuntimeError(f"unsupported expression {type(expr).__name__}")
 
     def _apply_binary(self, op: str, left: Any, right: Any) -> Any:
-        if op == "+": return left + right
-        if op == "-": return left - right
-        if op == "*": return left * right
-        if op == "/": return left / right
-        if op == "%": return left % right
-        if op == "==": return left == right
-        if op == "!=": return left != right
-        if op == "<": return left < right
-        if op == "<=": return left <= right
-        if op == ">": return left > right
-        if op == ">=": return left >= right
+        if op == "+":
+            return left + right
+        if op == "-":
+            return left - right
+        if op == "*":
+            return left * right
+        if op == "/":
+            return left / right
+        if op == "%":
+            return left % right
+        if op == "==":
+            return left == right
+        if op == "!=":
+            return left != right
+        if op == "<":
+            return left < right
+        if op == "<=":
+            return left <= right
+        if op == ">":
+            return left > right
+        if op == ">=":
+            return left >= right
         raise SetlhareRuntimeError(f"unknown binary operator {op}")
 
     def _unwrap(self, value: Any) -> Any:
         from setlhare.stdlib.result import Err, Ok
+
         if isinstance(value, Ok):
             return value.value
         if isinstance(value, Err):
@@ -340,6 +425,7 @@ class Interpreter:
             if len(parsed.body) != 1 or not isinstance(parsed.body[0], A.ExprStmt):
                 raise SetlhareRuntimeError("interpolation expects a single expression")
             return str(self._eval(parsed.body[0].expr, env))
+
         return re.sub(r"\$\{([^}]*)\}", repl, template)
 
     def _truthy(self, value: Any) -> bool:

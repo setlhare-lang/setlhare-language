@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from setlhare.stdlib.result import Err, Ok, Result
+from setlhare.stdlib.result import Err, Ok
 
 
 def __unwrap(value):

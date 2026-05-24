@@ -1,13 +1,27 @@
 from __future__ import annotations
+
 import pathlib
+from typing import Protocol
+
 from setlhare.parser.parser import Parser
+
 from .borrow import BorrowChecker
-from .typechecker import TypeChecker
 from .bytecode import BytecodeBackend
 from .llvm_backend import LLVMBackend
+from .typechecker import TypeChecker
 from .wasm_backend import WasmBackend
 
-BACKENDS = {"bytecode": BytecodeBackend, "llvm": LLVMBackend, "wasm": WasmBackend}
+
+class Backend(Protocol):
+    def emit(self, module): ...
+
+
+BACKENDS: dict[str, type[Backend]] = {
+    "bytecode": BytecodeBackend,
+    "llvm": LLVMBackend,
+    "wasm": WasmBackend,
+}
+
 
 def compile_file(path: pathlib.Path, target="bytecode", emit=False):
     source = path.read_text(encoding="utf-8")

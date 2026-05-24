@@ -1,5 +1,18 @@
-def upper(s): return str(s).upper()
-def lower(s): return str(s).lower()
-def trim(s): return str(s).strip()
-def split(s, sep=None): return str(s).split(sep)
-def join(parts, sep=""): return sep.join(map(str, parts))
+def upper(s):
+    return str(s).upper()
+
+
+def lower(s):
+    return str(s).lower()
+
+
+def trim(s):
+    return str(s).strip()
+
+
+def split(s, sep=None):
+    return str(s).split(sep)
+
+
+def join(parts, sep=""):
+    return sep.join(map(str, parts))
