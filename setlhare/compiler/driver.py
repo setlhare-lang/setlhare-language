@@ -16,7 +16,11 @@ class Backend(Protocol):
     def emit(self, module): ...
 
 
-BACKENDS: dict[str, type[Backend]] = {"bytecode": BytecodeBackend, "llvm": LLVMBackend, "wasm": WasmBackend}
+BACKENDS: dict[str, type[Backend]] = {
+    "bytecode": BytecodeBackend,
+    "llvm": LLVMBackend,
+    "wasm": WasmBackend,
+}
 
 
 def compile_file(path: pathlib.Path, target="bytecode", emit=False):
