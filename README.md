@@ -42,8 +42,8 @@ See `docs/spec/00-overview.md` for the design north star.
 Requires Python ≥ 3.11.
 
 ```bash
-git clone https://github.com/setlhare-lang/setlhare.git
-cd setlhare
+git clone https://github.com/setlhare-lang/setlhare-language.git
+cd setlhare-language
 pip install -e ".[dev]"
 
 setlhare run examples/hello.sl
@@ -118,7 +118,7 @@ setlhare-lang/setlhare
 | **v0.9** | LLVM backend |
 | **v1.0** | Stability + conformance suite + docs |
 
-Track progress on the [GitHub milestones page](https://github.com/setlhare-lang/setlhare/milestones).
+Track progress on the [GitHub milestones page](https://github.com/setlhare-lang/setlhare-language/milestones).
 
 ---
 
