@@ -1,0 +1,137 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "setlhare"
+version = "0.1.0a0"
+description = "The Setlhare programming language — compiler, runtime, and tooling"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "The Setlhare Authors" }]
+keywords = ["programming-language", "compiler", "interpreter", "setlhare"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Interpreters",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5.0",
+    "mypy>=1.11",
+    "pre-commit>=3.7",
+]
+llvm = [
+    # Optional native backend deps; install only when working on codegen/llvm
+    "llvmlite>=0.43",
+]
+wasm = [
+    # Optional WASM backend deps
+    "wasmer>=1.1",
+]
+lsp = [
+    "pygls>=1.3",
+]
+
+[project.scripts]
+setlhare = "setlhare.cli:main"
+spore = "setlhare.tools.spore:main"
+
+[project.urls]
+Homepage = "https://github.com/setlhare-lang/setlhare"
+Repository = "https://github.com/setlhare-lang/setlhare"
+Issues = "https://github.com/setlhare-lang/setlhare/issues"
+Specification = "https://github.com/setlhare-lang/setlhare/tree/main/docs/spec"
+
+[tool.setuptools.packages.find]
+include = ["setlhare*"]
+
+# ─────────────────────────────── tooling ───────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["grammar/tree-sitter-setlhare", "tools/vscode-setlhare"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",  # handled by formatter
+    "B008",  # function calls in defaults are fine for AST nodes
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B", "SIM"]
+"setlhare/compiler/llvm_backend.py" = ["F"]   # skeleton
+"setlhare/compiler/wasm_backend.py" = ["F"]   # skeleton
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_defs = false  # tighten as we go
+ignore_missing_imports = true
+exclude = [
+    "grammar/",
+    "tools/vscode-setlhare/",
+    "tests/fixtures/",
+]
+
+[[tool.mypy.overrides]]
+module = "setlhare.compiler.llvm_backend"
+ignore_errors = true  # skeleton — re-enable in v0.9
+
+[[tool.mypy.overrides]]
+module = "setlhare.compiler.wasm_backend"
+ignore_errors = true  # skeleton — re-enable in v0.8
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+    "slow: tests that take >1s",
+    "conformance: language conformance suite",
+    "spec: tests that codify a spec rule (must reference docs/spec/...)",
+]
+
+[tool.coverage.run]
+source = ["setlhare"]
+branch = true
+omit = [
+    "setlhare/compiler/llvm_backend.py",
+    "setlhare/compiler/wasm_backend.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

@@ -1,0 +1,28 @@
+# Default owners for everything
+*                                @tbmosweu
+
+# Specification — review required for any change
+/docs/spec/                      @tbmosweu
+
+# Compiler core
+/setlhare/lexer/                 @tbmosweu
+/setlhare/parser/                @tbmosweu
+/setlhare/compiler/              @tbmosweu
+
+# Runtime
+/setlhare/runtime/               @tbmosweu
+
+# Stdlib
+/setlhare/stdlib/                @tbmosweu
+/std/                            @tbmosweu
+
+# Tools
+/setlhare/tools/                 @tbmosweu
+/tools/                          @tbmosweu
+
+# Grammar
+/grammar/                        @tbmosweu
+
+# CI / build
+/.github/                        @tbmosweu
+/.devcontainer/                  @tbmosweu

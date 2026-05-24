@@ -1,0 +1,12 @@
+{
+  "name": "setlhare-vscode",
+  "displayName": "Setlhare",
+  "description": "Syntax highlighting for Setlhare .sl files",
+  "version": "0.1.0",
+  "engines": {"vscode": "^1.85.0"},
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [{"id": "setlhare", "aliases": ["Setlhare"], "extensions": [".sl"]}],
+    "grammars": [{"language": "setlhare", "scopeName": "source.setlhare", "path": "./syntaxes/setlhare.tmLanguage.json"}]
+  }
+}

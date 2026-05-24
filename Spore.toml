@@ -1,0 +1,5 @@
+[package]
+name = "setlhare"
+version = "0.1.0"
+
+[deps]

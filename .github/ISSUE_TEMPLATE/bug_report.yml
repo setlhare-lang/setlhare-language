@@ -1,0 +1,40 @@
+name: Bug report
+description: Something the compiler / runtime / tool does wrong
+labels: ["kind:bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please give a *minimal* reproduction.
+  - type: input
+    id: version
+    attributes:
+      label: Setlhare version / commit SHA
+      placeholder: "v0.1.0a1 or 1a2b3c4"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction (.sl source)
+      render: setlhare
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour (include error output)
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: spec-ref
+    attributes:
+      label: Relevant spec section (if any)
+      placeholder: "docs/spec/03-types.md §3.4"

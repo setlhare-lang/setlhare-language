@@ -1,0 +1,49 @@
+name: Spec lint
+
+on:
+  pull_request:
+    paths:
+      - "docs/spec/**"
+      - "setlhare/**"
+      - "tests/conformance/**"
+      - ".github/workflows/spec.yml"
+
+jobs:
+  spec-files-present:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required spec files exist
+        run: |
+          set -e
+          required=(
+            docs/spec/00-overview.md
+            docs/spec/01-lexical.md
+            docs/spec/02-syntax.md
+            docs/spec/03-types.md
+            docs/spec/04-ownership.md
+            docs/spec/05-modules.md
+            docs/spec/06-concurrency.md
+            docs/spec/07-errors.md
+            docs/spec/08-abi.md
+            docs/spec/09-stdlib.md
+          )
+          missing=0
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "::error file=$f::Missing required spec file"
+              missing=1
+            fi
+          done
+          exit $missing
+
+  conformance-suite-present:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conformance directory exists
+        run: |
+          if [ ! -d "tests/conformance" ]; then
+            echo "::error::tests/conformance/ is required"
+            exit 1
+          fi

@@ -1,0 +1,33 @@
+{
+  "name": "tree-sitter-setlhare",
+  "version": "0.0.1",
+  "description": "Tree-sitter grammar for the Setlhare programming language",
+  "main": "bindings/node",
+  "keywords": [
+    "parser",
+    "tree-sitter",
+    "setlhare"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/setlhare-lang/setlhare.git",
+    "directory": "grammar/tree-sitter-setlhare"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.22.0"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.setlhare",
+      "file-types": [
+        "sl"
+      ]
+    }
+  ]
+}

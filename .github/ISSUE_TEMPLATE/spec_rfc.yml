@@ -1,0 +1,48 @@
+name: Spec RFC
+description: Proposal that changes the language specification
+labels: ["kind:rfc", "kind:spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for any change to syntax, semantics, typing, ownership,
+        modules, concurrency, ABI, errors, or the standard library.
+        Implementation discussion goes in a separate issue once the RFC is accepted.
+  - type: input
+    id: title
+    attributes:
+      label: One-line summary
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation — what problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Design
+      description: Syntax, semantics, examples. Show EBNF if you touch grammar.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+  - type: textarea
+    id: drawbacks
+    attributes:
+      label: Drawbacks / open questions
+    validations:
+      required: true
+  - type: input
+    id: affected
+    attributes:
+      label: Affected spec files
+      placeholder: "docs/spec/03-types.md, docs/spec/02-syntax.md"
+    validations:
+      required: true

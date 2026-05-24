@@ -1,0 +1,60 @@
+# --- macOS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg
+.venv/
+venv/
+env/
+
+# --- Setlhare build artifacts ---
+spore_packages/
+*.slc          # compiled Setlhare bytecode
+*.slm          # compiled Setlhare module
+target/
+out/
+*.wasm
+*.wat
+*.ll
+*.bc
+*.o
+*.a
+*.so
+*.dylib
+
+# --- LLVM/clang ---
+compile_commands.json
+.cache/
+
+# --- Tree-sitter ---
+grammar/tree-sitter-setlhare/build/
+grammar/tree-sitter-setlhare/node_modules/
+grammar/tree-sitter-setlhare/src/parser.c
+grammar/tree-sitter-setlhare/src/tree_sitter/
+
+# --- Node (tools/vscode-setlhare, lsp) ---
+node_modules/
+*.tsbuildinfo
+*.log
+
+# --- Docs build ---
+docs/_build/
+docs/site/
+
+# --- OS / misc ---
+*.bak
+*.tmp
+*~

@@ -1,0 +1,11 @@
+{
+  "scopeName": "source.setlhare",
+  "patterns": [
+    {"name": "comment.line.double-slash.setlhare", "match": "//.*$"},
+    {"name": "keyword.control.setlhare", "match": "\\b(func|struct|actor|trait|match|case|if|elif|else|for|while|in|return|break|continue|spawn|go|mut|import|enum|macro)\\b"},
+    {"name": "constant.language.setlhare", "match": "\\b(true|false|nil)\\b"},
+    {"name": "string.quoted.double.setlhare", "begin": "\"", "end": "\"", "patterns": [{"name": "variable.interpolation.setlhare", "match": "\\$\\{[^}]+\\}"}]},
+    {"name": "constant.numeric.setlhare", "match": "\\b\\d+(\\.\\d+)?\\b"},
+    {"name": "entity.name.function.setlhare", "match": "(?<=func\\s)[A-Za-z_]\\w*"}
+  ]
+}
