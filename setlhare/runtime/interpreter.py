@@ -66,28 +66,186 @@ class Environment:
 
 
 class SetlhareFunction:
-    def __init__(self, node: A.Function, closure: Environment, interpreter: Interpreter):
+    def __init__(
+        self,
+        node: A.Function,
+        closure: Environment,
+        interpreter: Interpreter,
+        receiver: Any = None,
+        is_method: bool = False,
+    ):
         self.node = node
         self.closure = closure
         self.interpreter = interpreter
         self.__name__ = node.name
+        self.receiver = receiver
+        self.is_method = is_method
+
+    def bind(self, receiver: Any) -> SetlhareFunction:
+        return SetlhareFunction(self.node, self.closure, self.interpreter, receiver, is_method=True)
 
     def __call__(self, *args: Any) -> Any:
-        if len(args) != len(self.node.params):
+        params = self.node.params
+        if self.is_method:
+            args = (self.receiver, *args)
+        if len(args) != len(params):
             raise SetlhareRuntimeError(
-                f"function '{self.node.name}' expected {len(self.node.params)} arguments, got {len(args)}"
+                f"function '{self.node.name}' expected {len(params)} arguments, got {len(args)}"
             )
         env = Environment(self.closure)
-        for name, value in zip(self.node.params, args, strict=True):
+        for name, value in zip(params, args, strict=True):
             env.define(name, value, mutable=True)
         try:
-            self.interpreter._execute_block(self.node.body or A.Block(), env)
+            return self.interpreter._execute_block(self.node.body or A.Block(), env)
         except ReturnSignal as ret:
             return ret.value
-        return None
 
     def __repr__(self) -> str:
         return f"<func {self.node.name}>"
+
+
+class StructType:
+    """Runtime representation of a Setlhare struct."""
+
+    def __init__(self, name: str, fields: list[str]):
+        self.name = name
+        self.fields = fields
+        self.methods: dict[str, SetlhareFunction] = {}
+
+    def __call__(self, *args: Any, **kwargs: Any) -> StructInstance:
+        if args and kwargs:
+            raise SetlhareRuntimeError(
+                f"struct '{self.name}': mix of positional and named args not allowed"
+            )
+        if args:
+            if len(args) != len(self.fields):
+                raise SetlhareRuntimeError(
+                    f"struct '{self.name}' expected {len(self.fields)} fields, got {len(args)}"
+                )
+            data = dict(zip(self.fields, args, strict=True))
+        else:
+            for k in kwargs:
+                if k not in self.fields:
+                    raise SetlhareRuntimeError(f"struct '{self.name}' has no field '{k}'")
+            data = {f: kwargs.get(f) for f in self.fields}
+        return StructInstance(self, data)
+
+    def __repr__(self) -> str:
+        return f"<struct {self.name}>"
+
+
+class StructInstance:
+    __slots__ = ("_data", "_type")
+
+    def __init__(self, type_: StructType, data: dict[str, Any]):
+        object.__setattr__(self, "_type", type_)
+        object.__setattr__(self, "_data", data)
+
+    def __getattr__(self, name: str) -> Any:
+        data = object.__getattribute__(self, "_data")
+        if name in data:
+            return data[name]
+        type_ = object.__getattribute__(self, "_type")
+        if name in type_.methods:
+            return type_.methods[name].bind(self)
+        raise AttributeError(f"struct '{type_.name}' has no field or method '{name}'")
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        data = object.__getattribute__(self, "_data")
+        type_ = object.__getattribute__(self, "_type")
+        if name not in data:
+            raise SetlhareRuntimeError(f"struct '{type_.name}' has no field '{name}'")
+        data[name] = value
+
+    def __repr__(self) -> str:
+        type_ = object.__getattribute__(self, "_type")
+        data = object.__getattribute__(self, "_data")
+        body = ", ".join(f"{k}: {v!r}" for k, v in data.items())
+        return f"{type_.name} {{ {body} }}"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, StructInstance):
+            return NotImplemented
+        return object.__getattribute__(self, "_type") is object.__getattribute__(
+            other, "_type"
+        ) and object.__getattribute__(self, "_data") == object.__getattribute__(other, "_data")
+
+    def __hash__(self) -> int:
+        return id(self)
+
+
+class EnumType:
+    """Runtime representation of a Setlhare enum (sum type)."""
+
+    def __init__(self, name: str, variants: dict[str, list[str]]):
+        self.name = name
+        self.variants = variants  # variant_name -> field names
+        self.methods: dict[str, SetlhareFunction] = {}
+
+    def get_variant(self, variant: str) -> Any:
+        if variant not in self.variants:
+            raise SetlhareRuntimeError(f"enum '{self.name}' has no variant '{variant}'")
+        fields = self.variants[variant]
+        if not fields:
+            return EnumValue(self, variant, ())
+        return _VariantConstructor(self, variant, fields)
+
+    def __repr__(self) -> str:
+        return f"<enum {self.name}>"
+
+
+class _VariantConstructor:
+    def __init__(self, enum_type: EnumType, variant: str, fields: list[str]):
+        self.enum_type = enum_type
+        self.variant = variant
+        self.fields = fields
+
+    def __call__(self, *args: Any) -> EnumValue:
+        if len(args) != len(self.fields):
+            raise SetlhareRuntimeError(
+                f"variant '{self.enum_type.name}::{self.variant}' expected "
+                f"{len(self.fields)} args, got {len(args)}"
+            )
+        return EnumValue(self.enum_type, self.variant, tuple(args))
+
+    def __repr__(self) -> str:
+        return f"<variant {self.enum_type.name}::{self.variant}>"
+
+
+class EnumValue:
+    __slots__ = ("_type", "payload", "variant")
+
+    def __init__(self, type_: EnumType, variant: str, payload: tuple):
+        self._type = type_
+        self.variant = variant
+        self.payload = payload
+
+    def __getattr__(self, name: str) -> Any:
+        type_ = object.__getattribute__(self, "_type")
+        if name in type_.methods:
+            return type_.methods[name].bind(self)
+        raise AttributeError(
+            f"enum value '{type_.name}::{object.__getattribute__(self, 'variant')}' "
+            f"has no method '{name}'"
+        )
+
+    def __repr__(self) -> str:
+        if not self.payload:
+            return f"{self._type.name}::{self.variant}"
+        body = ", ".join(repr(p) for p in self.payload)
+        return f"{self._type.name}::{self.variant}({body})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EnumValue):
+            return NotImplemented
+        return (
+            self._type is other._type
+            and self.variant == other.variant
+            and self.payload == other.payload
+        )
+
+    def __hash__(self) -> int:
+        return hash((id(self._type), self.variant, self.payload))
 
 
 class BoundMethod:
@@ -232,6 +390,29 @@ class Interpreter:
         if isinstance(stmt, A.Function):
             env.define(stmt.name, SetlhareFunction(stmt, env, self), mutable=False)
             return None
+        if isinstance(stmt, A.StructDecl):
+            env.define(stmt.name, StructType(stmt.name, stmt.fields), mutable=False)
+            return None
+        if isinstance(stmt, A.EnumDecl):
+            variants = {v.name: v.fields for v in stmt.variants}
+            env.define(stmt.name, EnumType(stmt.name, variants), mutable=False)
+            return None
+        if isinstance(stmt, A.ImplBlock):
+            target = env.get(stmt.target)
+            if not isinstance(target, (StructType, EnumType)):
+                raise SetlhareRuntimeError(f"impl target '{stmt.target}' is not a struct or enum")
+            for method in stmt.methods:
+                # Methods take 'self' implicitly: prepend it as first param.
+                node = A.Function(
+                    method.line,
+                    method.col,
+                    method.name,
+                    ["self", *method.params],
+                    method.body,
+                    method.return_type,
+                )
+                target.methods[method.name] = SetlhareFunction(node, env, self)
+            return None
         if isinstance(stmt, A.Binding):
             env.define(stmt.name, self._eval(stmt.value, env), stmt.mutable, stmt.type_name)
             return None
@@ -304,12 +485,32 @@ class Interpreter:
     def _execute_match(self, stmt: A.Match, env: Environment) -> Any:
         value = self._eval(stmt.value, env)
         for case in stmt.cases:
-            if case.is_wildcard or self._eval(case.pattern, env) == value:
-                try:
-                    return self._execute_block(case.body or A.Block(), Environment(env))
-                except ReturnSignal as ret:
-                    return ret.value
+            case_env = Environment(env)
+            if not self._pattern_matches(case, value, case_env):
+                continue
+            return self._execute_block(case.body or A.Block(), case_env)
         return None
+
+    def _pattern_matches(self, case: A.MatchCase, value: Any, env: Environment) -> bool:
+        if case.is_wildcard:
+            return True
+        pattern = case.pattern
+        if isinstance(pattern, A.VariantPattern):
+            if not isinstance(value, EnumValue):
+                return False
+            if value._type.name != pattern.type_name or value.variant != pattern.variant:
+                return False
+            if len(pattern.bindings) != len(value.payload):
+                return False
+            for binding, payload in zip(pattern.bindings, value.payload, strict=True):
+                if binding is not None:
+                    env.define(binding, payload, mutable=True)
+            return True
+        if isinstance(pattern, A.Path):
+            # zero-arg variant pattern via path expression
+            evaluated = self._eval(pattern, env)
+            return evaluated == value
+        return self._eval(pattern, env) == value
 
     def _import(self, stmt: A.Import, env: Environment) -> None:
         path = stmt.module
@@ -390,6 +591,14 @@ class Interpreter:
                 raise SetlhareRuntimeError(
                     f"object {obj!r} has no attribute '{expr.name}'"
                 ) from exc
+        if isinstance(expr, A.StructLit):
+            target = env.get(expr.type_name)
+            if not isinstance(target, StructType):
+                raise SetlhareRuntimeError(f"'{expr.type_name}' is not a struct")
+            kwargs = {name: self._eval(value, env) for name, value in expr.fields}
+            return target(**kwargs)
+        if isinstance(expr, A.Path):
+            return self._resolve_path(expr.parts, env)
         if isinstance(expr, A.Index):
             return self._eval(expr.obj, env)[self._eval(expr.index, env)]
         if isinstance(expr, A.ResultUnwrap):
@@ -403,6 +612,18 @@ class Interpreter:
             spawner = env.get(expr.kind)
             return spawner(fn, *args)
         raise SetlhareRuntimeError(f"unsupported expression {type(expr).__name__}")
+
+    def _resolve_path(self, parts: list[str], env: Environment) -> Any:
+        if len(parts) < 2:
+            return env.get(parts[0])
+        head = env.get(parts[0])
+        if isinstance(head, EnumType) and len(parts) == 2:
+            return head.get_variant(parts[1])
+        # Generic attribute walk for module paths.
+        value: Any = head
+        for part in parts[1:]:
+            value = value.get_variant(part) if isinstance(value, EnumType) else getattr(value, part)
+        return value
 
     def _apply_binary(self, op: str, left: Any, right: Any) -> Any:
         if op == "+":

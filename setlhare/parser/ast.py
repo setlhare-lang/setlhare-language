@@ -184,6 +184,48 @@ class Spawn(Node):
     kind: str = "spawn"
 
 
+@dataclass(slots=True)
+class StructDecl(Node):
+    name: str = ""
+    fields: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class VariantDecl(Node):
+    name: str = ""
+    fields: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class EnumDecl(Node):
+    name: str = ""
+    variants: list[VariantDecl] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ImplBlock(Node):
+    target: str = ""
+    methods: list[Function] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class StructLit(Node):
+    type_name: str = ""
+    fields: list[tuple[str, Any]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class Path(Node):
+    parts: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class VariantPattern(Node):
+    type_name: str = ""
+    variant: str = ""
+    bindings: list[str | None] = field(default_factory=list)
+
+
 # Backward-compatible wrapper used by older compiler code paths.
 @dataclass(slots=True)
 class Expr(Node):

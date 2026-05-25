@@ -30,6 +30,12 @@ class Parser:
             return self._import(self._previous())
         if self._match("FUNC"):
             return self._function(self._previous())
+        if self._match("STRUCT"):
+            return self._struct(self._previous())
+        if self._match("ENUM"):
+            return self._enum(self._previous())
+        if self._match("IMPL"):
+            return self._impl(self._previous())
         return self._statement()
 
     def _statement(self) -> Any:
@@ -85,6 +91,59 @@ class Parser:
                 return A.AttrAssign(expr.line, expr.col, expr, value, op)
             raise self._error(op_tok, "invalid assignment target")
         return A.ExprStmt(expr.line, expr.col, expr)
+
+    def _struct(self, tok: Token) -> A.StructDecl:
+        name = self._consume("ID", "expected struct name")
+        self._consume("LBRACE", "expected '{' after struct name")
+        fields: list[str] = []
+        self._skip_separators()
+        while not self._check("RBRACE") and not self._check("EOF"):
+            fname = self._consume("ID", "expected field name")
+            self._optional_type()
+            fields.append(fname.value)
+            if self._match("COMMA"):
+                self._skip_separators()
+            else:
+                self._skip_separators()
+        self._consume("RBRACE", "expected '}' after struct fields")
+        return A.StructDecl(tok.line, tok.col, name.value, fields)
+
+    def _enum(self, tok: Token) -> A.EnumDecl:
+        name = self._consume("ID", "expected enum name")
+        self._consume("LBRACE", "expected '{' after enum name")
+        variants: list[A.VariantDecl] = []
+        self._skip_separators()
+        while not self._check("RBRACE") and not self._check("EOF"):
+            vname = self._consume("ID", "expected variant name")
+            vfields: list[str] = []
+            if self._match("LPAREN"):
+                if not self._check("RPAREN"):
+                    while True:
+                        f = self._consume("ID", "expected variant field name")
+                        self._optional_type()
+                        vfields.append(f.value)
+                        if not self._match("COMMA"):
+                            break
+                self._consume("RPAREN", "expected ')' after variant fields")
+            variants.append(A.VariantDecl(vname.line, vname.col, vname.value, vfields))
+            if self._match("COMMA"):
+                self._skip_separators()
+            else:
+                self._skip_separators()
+        self._consume("RBRACE", "expected '}' after enum variants")
+        return A.EnumDecl(tok.line, tok.col, name.value, variants)
+
+    def _impl(self, tok: Token) -> A.ImplBlock:
+        target = self._consume("ID", "expected target type after 'impl'")
+        self._consume("LBRACE", "expected '{' after impl target")
+        methods: list[A.Function] = []
+        self._skip_separators()
+        while not self._check("RBRACE") and not self._check("EOF"):
+            self._consume("FUNC", "impl block contains only func declarations")
+            methods.append(self._function(self._previous()))
+            self._skip_separators()
+        self._consume("RBRACE", "expected '}' after impl block")
+        return A.ImplBlock(tok.line, tok.col, target.value, methods)
 
     def _import(self, tok: Token) -> A.Import:
         parts = [self._consume("ID", "expected module path after import").value]
@@ -153,10 +212,10 @@ class Parser:
         self._skip_separators()
         while not self._check("RBRACE") and not self._check("EOF"):
             wildcard = False
+            pattern: Any = None
             if self._match("CASE"):
-                pattern = self._expression()
+                pattern = self._pattern()
             elif self._match("ID") and self._previous().value == "_":
-                pattern = None
                 wildcard = True
             else:
                 raise self._error(self._peek(), "expected 'case' or '_' in match")
@@ -164,12 +223,37 @@ class Parser:
             if self._match("LBRACE"):
                 body = self._block_after_open()
             else:
-                expr = self._expression()
-                body = A.Block(expr.line, expr.col, [A.Return(expr.line, expr.col, expr)])
+                arm_stmt = self._statement()
+                body = A.Block(arm_stmt.line, arm_stmt.col, [arm_stmt])
             cases.append(A.MatchCase(tok.line, tok.col, pattern, body, wildcard))
             self._skip_separators()
         self._consume("RBRACE", "expected '}' after match")
         return A.Match(tok.line, tok.col, value, cases)
+
+    def _pattern(self) -> Any:
+        # `Type::Variant` or `Type::Variant(b1, b2)` or arbitrary expression compared by ==.
+        if self._check("ID") and self._peek_next().kind == "DCOLON":
+            type_tok = self._advance()
+            self._consume("DCOLON", "expected '::' in variant pattern")
+            variant = self._consume("ID", "expected variant name")
+            bindings: list[str | None] = []
+            if self._match("LPAREN"):
+                if not self._check("RPAREN"):
+                    while True:
+                        if self._match("ID"):
+                            value = self._previous().value
+                            bindings.append(None if value == "_" else value)
+                        else:
+                            raise self._error(
+                                self._peek(), "variant pattern bindings must be names or '_'"
+                            )
+                        if not self._match("COMMA"):
+                            break
+                self._consume("RPAREN", "expected ')' after variant pattern bindings")
+            return A.VariantPattern(
+                type_tok.line, type_tok.col, type_tok.value, variant.value, bindings
+            )
+        return self._expression()
 
     def _block(self) -> A.Block:
         self._consume("LBRACE", "expected '{' to start block")
@@ -286,8 +370,30 @@ class Parser:
         if self._match("NIL"):
             t = self._previous()
             return A.Literal(t.line, t.col, None, t.value)
-        if self._match("ID"):
+        if self._match("ID") or self._match("SELF"):
             t = self._previous()
+            # Path: A::B::C
+            if self._check("DCOLON"):
+                parts = [t.value]
+                while self._match("DCOLON"):
+                    nxt = self._consume("ID", "expected name after '::'")
+                    parts.append(nxt.value)
+                return A.Path(t.line, t.col, parts)
+            # Struct literal: Name { field: value, ... }
+            if self._check("LBRACE") and self._is_struct_literal_ahead():
+                self._advance()  # consume LBRACE
+                fields: list[tuple[str, Any]] = []
+                self._skip_separators()
+                while not self._check("RBRACE") and not self._check("EOF"):
+                    fname = self._consume("ID", "expected field name in struct literal")
+                    self._consume("COLON", "expected ':' after field name")
+                    fields.append((fname.value, self._expression()))
+                    if self._match("COMMA"):
+                        self._skip_separators()
+                    else:
+                        self._skip_separators()
+                rb = self._consume("RBRACE", "expected '}' after struct literal")
+                return A.StructLit(rb.line, rb.col, t.value, fields)
             return A.Name(t.line, t.col, t.value)
         if self._match("LPAREN"):
             expr = self._expression()
@@ -367,6 +473,23 @@ class Parser:
 
     def _peek_next(self) -> Token:
         return self.tokens[min(self.current + 1, len(self.tokens) - 1)]
+
+    def _peek_at(self, offset: int) -> Token:
+        return self.tokens[min(self.current + offset, len(self.tokens) - 1)]
+
+    def _is_struct_literal_ahead(self) -> bool:
+        # current is LBRACE; look for `{ ID : ...` or `{ }` to disambiguate from blocks.
+        i = 1
+        while self._peek_at(i).kind in {"NEWLINE", "SEMI"}:
+            i += 1
+        if self._peek_at(i).kind == "RBRACE":
+            return True
+        if self._peek_at(i).kind != "ID":
+            return False
+        j = i + 1
+        while self._peek_at(j).kind in {"NEWLINE", "SEMI"}:
+            j += 1
+        return self._peek_at(j).kind == "COLON"
 
     def _previous(self) -> Token:
         return self.tokens[self.current - 1]
