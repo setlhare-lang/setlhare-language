@@ -41,6 +41,21 @@ DOUBLE = {
     "&&": "ANDAND",
     "||": "OROR",
     "->": "THIN_ARROW",
+    "+=": "PLUSEQ",
+    "-=": "MINUSEQ",
+    "*=": "STAREQ",
+    "/=": "SLASHEQ",
+    "%=": "PERCENTEQ",
+}
+
+_STRING_ESCAPES = {
+    "n": "\n",
+    "t": "\t",
+    "r": "\r",
+    "0": "\0",
+    "\\": "\\",
+    '"': '"',
+    "'": "'",
 }
 
 
@@ -90,35 +105,41 @@ class Lexer:
                 col += 2
                 continue
             if ch == '"':
-                start_i, start_line, start_col = i, line, col
+                start_line, start_col = line, col
                 i += 1
                 col += 1
-                escaped = False
+                buf: list[str] = []
+                terminated = False
                 while i < n:
                     c = source[i]
-                    if escaped:
-                        escaped = False
-                        i += 1
-                        col += 1
-                        continue
                     if c == "\\":
-                        escaped = True
-                        i += 1
-                        col += 1
+                        if i + 1 >= n:
+                            raise SetlhareSyntaxError(f"unterminated string escape at {line}:{col}")
+                        nxt = source[i + 1]
+                        if nxt in _STRING_ESCAPES:
+                            buf.append(_STRING_ESCAPES[nxt])
+                        else:
+                            raise SetlhareSyntaxError(
+                                f"unknown string escape '\\{nxt}' at {line}:{col}"
+                            )
+                        i += 2
+                        col += 2
                         continue
                     if c == '"':
                         i += 1
                         col += 1
-                        tokens.append(Token("STRING", source[start_i:i], start_line, start_col))
+                        terminated = True
                         break
                     if c == "\n":
                         raise SetlhareSyntaxError(
                             f"unterminated string at {start_line}:{start_col}"
                         )
+                    buf.append(c)
                     i += 1
                     col += 1
-                else:
+                if not terminated:
                     raise SetlhareSyntaxError(f"unterminated string at {start_line}:{start_col}")
+                tokens.append(Token("STRING", "".join(buf), start_line, start_col))
                 continue
             if ch.isdigit():
                 start_i, start_col = i, col

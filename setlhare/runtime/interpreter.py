@@ -134,7 +134,7 @@ class Interpreter:
 
     def run_file(self, path: pathlib.Path) -> Any:
         source = path.read_text(encoding="utf-8")
-        module = self.parser.parse(source)
+        module = self.parser.parse(source, str(path))
         self._execute_module(module, self.globals)
         main = self.globals._find("main")
         if main:
@@ -142,7 +142,7 @@ class Interpreter:
         return None
 
     def run_source(self, source: str, filename: str = "<memory>") -> Any:
-        module = self.parser.parse(source)
+        module = self.parser.parse(source, filename)
         return self._execute_module(module, self.globals)
 
     def repl(self) -> None:
@@ -236,7 +236,27 @@ class Interpreter:
             env.define(stmt.name, self._eval(stmt.value, env), stmt.mutable, stmt.type_name)
             return None
         if isinstance(stmt, A.Assign):
-            env.assign(stmt.name, self._eval(stmt.value, env))
+            new_value = self._eval(stmt.value, env)
+            if stmt.op != "=":
+                current = env.get(stmt.name)
+                new_value = self._apply_binary(stmt.op[:-1], current, new_value)
+            env.assign(stmt.name, new_value)
+            return None
+        if isinstance(stmt, A.IndexAssign):
+            obj = self._eval(stmt.target.obj, env)
+            idx = self._eval(stmt.target.index, env)
+            new_value = self._eval(stmt.value, env)
+            if stmt.op != "=":
+                new_value = self._apply_binary(stmt.op[:-1], obj[idx], new_value)
+            obj[idx] = new_value
+            return None
+        if isinstance(stmt, A.AttrAssign):
+            obj = self._eval(stmt.target.obj, env)
+            name = stmt.target.name
+            new_value = self._eval(stmt.value, env)
+            if stmt.op != "=":
+                new_value = self._apply_binary(stmt.op[:-1], getattr(obj, name), new_value)
+            setattr(obj, name, new_value)
             return None
         if isinstance(stmt, A.ExprStmt):
             return self._eval(stmt.expr, env)

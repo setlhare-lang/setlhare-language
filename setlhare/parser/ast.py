@@ -40,6 +40,21 @@ class Binding(Node):
 class Assign(Node):
     name: str = ""
     value: Any = None
+    op: str = "="  # "=", "+=", "-=", "*=", "/=", "%="
+
+
+@dataclass(slots=True)
+class IndexAssign(Node):
+    target: Any = None  # Index node
+    value: Any = None
+    op: str = "="
+
+
+@dataclass(slots=True)
+class AttrAssign(Node):
+    target: Any = None  # GetAttr node
+    value: Any = None
+    op: str = "="
 
 
 @dataclass(slots=True)
