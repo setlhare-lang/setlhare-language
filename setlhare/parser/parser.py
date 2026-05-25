@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from setlhare.errors import SetlhareSyntaxError
+from setlhare.errors import SetlhareSyntaxError, format_source_context
 from setlhare.lexer.lexer import Lexer
 from setlhare.lexer.tokens import Token
 
@@ -12,7 +12,9 @@ from . import ast as A
 class Parser:
     """Recursive-descent parser for the implemented Setlhare MVP grammar."""
 
-    def parse(self, source: str) -> A.Module:
+    def parse(self, source: str, filename: str = "<source>") -> A.Module:
+        self.source = source
+        self.filename = filename
         self.tokens = Lexer().tokenize(source)
         self.current = 0
         body: list[Any] = []
@@ -55,15 +57,33 @@ class Parser:
             typ = self._optional_type()
             self._consume("EQ", "expected '=' after mutable binding name")
             return A.Binding(tok.line, tok.col, name.value, self._expression(), True, typ)
-        if self._check("ID") and self._peek_next().kind in {"COLON_EQ", "EQ", "COLON"}:
+        if self._check("ID") and self._peek_next().kind in {"COLON_EQ", "COLON"}:
             name = self._advance()
             typ = self._optional_type()
             if self._match("COLON_EQ"):
                 return A.Binding(name.line, name.col, name.value, self._expression(), False, typ)
-            if self._match("EQ"):
-                return A.Assign(name.line, name.col, name.value, self._expression())
-            raise self._error(self._peek(), "expected ':=' or '=' after binding name/type")
+            raise self._error(self._peek(), "expected ':=' after typed binding")
         expr = self._expression()
+        # Possible assignment target: NAME = expr, obj.attr = expr, obj[idx] = expr, plus compound ops.
+        assign_ops = {
+            "EQ": "=",
+            "PLUSEQ": "+=",
+            "MINUSEQ": "-=",
+            "STAREQ": "*=",
+            "SLASHEQ": "/=",
+            "PERCENTEQ": "%=",
+        }
+        if self._peek().kind in assign_ops:
+            op_tok = self._advance()
+            op = assign_ops[op_tok.kind]
+            value = self._expression()
+            if isinstance(expr, A.Name):
+                return A.Assign(expr.line, expr.col, expr.name, value, op)
+            if isinstance(expr, A.Index):
+                return A.IndexAssign(expr.line, expr.col, expr, value, op)
+            if isinstance(expr, A.GetAttr):
+                return A.AttrAssign(expr.line, expr.col, expr, value, op)
+            raise self._error(op_tok, "invalid assignment target")
         return A.ExprStmt(expr.line, expr.col, expr)
 
     def _import(self, tok: Token) -> A.Import:
@@ -256,7 +276,7 @@ class Parser:
             return A.Literal(t.line, t.col, float(t.value), t.value)
         if self._match("STRING"):
             t = self._previous()
-            return A.Literal(t.line, t.col, t.value[1:-1], t.value)
+            return A.Literal(t.line, t.col, t.value, t.value)
         if self._match("TRUE"):
             t = self._previous()
             return A.Literal(t.line, t.col, True, t.value)
@@ -352,4 +372,10 @@ class Parser:
         return self.tokens[self.current - 1]
 
     def _error(self, tok: Token, msg: str) -> SetlhareSyntaxError:
-        return SetlhareSyntaxError(f"{msg} at {tok.line}:{tok.col}; saw {tok.kind} {tok.value!r}")
+        snippet = format_source_context(
+            getattr(self, "source", ""),
+            tok.line,
+            tok.col,
+            filename=getattr(self, "filename", "<source>"),
+        )
+        return SetlhareSyntaxError(f"{msg}; saw {tok.kind} {tok.value!r}\n{snippet}")
