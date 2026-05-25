@@ -24,6 +24,8 @@ KEYWORDS = {
     "import",
     "enum",
     "macro",
+    "impl",
+    "self",
     "true",
     "false",
     "nil",
