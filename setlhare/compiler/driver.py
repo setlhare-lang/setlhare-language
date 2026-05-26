@@ -25,8 +25,8 @@ BACKENDS: dict[str, type[Backend]] = {
 
 def compile_file(path: pathlib.Path, target="bytecode", emit=False):
     source = path.read_text(encoding="utf-8")
-    module = Parser().parse(source)
-    types = TypeChecker().check(module)
+    module = Parser().parse(source, str(path))
+    types = TypeChecker().check(module, source=source, filename=str(path))
     BorrowChecker().check(module)
     artifact = BACKENDS[target]().emit(module)
     if emit:
@@ -37,5 +37,5 @@ def compile_file(path: pathlib.Path, target="bytecode", emit=False):
     else:
         print("check ok")
         for name, typ in sorted(types.items()):
-            print(f"  {name}: {typ.name}")
+            print(f"  {name}: {typ.pretty()}")
     return artifact
